@@ -1,2 +1,6 @@
 psycopg2-binary
 bcrypt
+fastapi
+uvicorn
+pydantic
+python-dotenv
