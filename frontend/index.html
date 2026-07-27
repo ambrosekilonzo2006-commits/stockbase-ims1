@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>StockBase · IMS</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#05060a; --glass:rgba(20,24,33,.55); --glass2:rgba(30,36,48,.45);
+  --border:rgba(255,255,255,.08); --txt:#e8edf4; --mut:#8b95a7;
+  --grn:#36f1a3; --grn2:#0bd47a; --blue:#5b8cff; --pur:#b388ff; --org:#ff9f43; --red:#ff5c7c;
+  --glow:0 0 24px rgba(54,241,163,.25);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:'Space Grotesk',sans-serif; background:var(--bg); color:var(--txt);
+  overflow-x:hidden; line-height:1.5;
+}
+/* aurora bg */
+.aurora{position:fixed;inset:0;z-index:-2;overflow:hidden}
+.aurora span{position:absolute;border-radius:50%;filter:blur(80px);opacity:.5;animation:float 18s infinite ease-in-out}
+.aurora span:nth-child(1){width:420px;height:420px;background:#0bd47a;left:-100px;top:-80px}
+.aurora span:nth-child(2){width:380px;height:380px;background:#5b8cff;right:-120px;top:30%}
+.aurora span:nth-child(3){width:360px;height:360px;background:#b388ff;left:30%;bottom:-120px}
+@keyframes float{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(40px,-30px) scale(1.15)}}
+.grid-overlay{position:fixed;inset:0;z-index:-1;background-image:linear-gradient(rgba(255,255,255,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.02) 1px,transparent 1px);background-size:40px 40px;mask-image:radial-gradient(circle at 50% 30%,#000,transparent 80%)}
+
+/* login */
+#login{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:50}
+.login-card{
+  width:380px;padding:2.4rem;border-radius:20px;background:var(--glass);backdrop-filter:blur(20px);
+  border:1px solid var(--border);box-shadow:0 20px 60px rgba(0,0,0,.5);animation:pop .6s cubic-bezier(.2,.8,.2,1)
+}
+@keyframes pop{from{opacity:0;transform:translateY(20px) scale(.96)}to{opacity:1;transform:none}}
+.brand{font-family:'JetBrains Mono';font-weight:600;font-size:1.4rem;background:linear-gradient(90deg,var(--grn),var(--blue));-webkit-background-clip:text;background-clip:text;color:transparent}
+.brand-sub{color:var(--mut);font-size:.8rem;margin:.2rem 0 1.8rem}
+.field{margin-bottom:1rem}
+.field label{display:block;font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--mut);margin-bottom:.4rem}
+.field input{width:100%;padding:.75rem 1rem;border-radius:12px;border:1px solid var(--border);background:rgba(0,0,0,.25);color:var(--txt);font-family:inherit;font-size:.95rem;transition:.2s}
+.field input:focus{outline:none;border-color:var(--grn);box-shadow:var(--glow)}
+.login-btn{width:100%;margin-top:1.2rem;padding:.8rem;border:none;border-radius:12px;cursor:pointer;font-family:inherit;font-weight:600;font-size:.95rem;color:#04130c;background:linear-gradient(90deg,var(--grn),var(--grn2));transition:.2s}
+.login-btn:hover{transform:translateY(-2px);box-shadow:var(--glow)}
+.login-err{margin-top:.8rem;padding:.6rem .8rem;border-radius:10px;background:rgba(255,92,124,.12);border:1px solid var(--red);color:var(--red);font-size:.8rem;display:none}
+#login-canvas{position:fixed;inset:0;z-index:-1;opacity:.35}
+
+/* app shell */
+#app{display:none;min-height:100vh}
+.sidebar{position:fixed;top:0;left:0;width:240px;height:100vh;padding:1.4rem 1rem;background:var(--glass);backdrop-filter:blur(20px);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:30;transition:.3s}
+.sidebar .logo{font-family:'JetBrains Mono';font-weight:600;color:var(--grn);font-size:1.1rem}
+.sidebar .role{margin:1.2rem 0;padding:.8rem;border-radius:14px;background:var(--glass2);border:1px solid var(--border);display:flex;align-items:center;gap:.7rem}
+.avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--grn),var(--blue));display:flex;align-items:center;justify-content:center;font-weight:700;color:#04130c}
+.nav{display:flex;flex-direction:column;gap:.2rem;margin-top:.5rem;overflow-y:auto}
+.nav a{display:flex;align-items:center;gap:.7rem;padding:.65rem .8rem;border-radius:10px;color:var(--mut);text-decoration:none;font-size:.9rem;font-weight:500;cursor:pointer;transition:.15s;border-left:3px solid transparent}
+.nav a:hover{color:var(--txt);background:var(--glass2)}
+.nav a.active{color:var(--grn);background:rgba(54,241,163,.08);border-left-color:var(--grn)}
+.nav svg{width:18px;height:18px;flex-shrink:0}
+.nav-sep{font-size:.65rem;letter-spacing:.15em;text-transform:uppercase;color:var(--mut);opacity:.6;margin:1rem .8rem .3rem}
+.main{margin-left:240px;padding:0 2rem 3rem}
+.topbar{position:sticky;top:0;z-index:20;display:flex;justify-content:space-between;align-items:center;padding:1rem 0;background:linear-gradient(var(--bg),transparent)}
+.topbar h1{font-size:1.2rem;font-weight:600}
+.topbar .right{display:flex;align-items:center;gap:1rem;color:var(--mut);font-family:'JetBrains Mono';font-size:.8rem}
+.page{display:none;animation:fade .4s ease}
+.page.active{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+/* cards */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin:1rem 0 2rem}
+.card{background:var(--glass);backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:18px;padding:1.4rem;position:relative;overflow:hidden}
+.card::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--grn),transparent)}
+.stat .lbl{font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--mut)}
+.stat .val{font-family:'JetBrains Mono';font-size:2rem;font-weight:600;margin-top:.3rem}
+.stat.green .val{color:var(--grn)} .stat.blue .val{color:var(--blue)} .stat.org .val{color:var(--org)} .stat.pur .val{color:var(--pur)}
+.charts{display:grid;grid-template-columns:1.4fr 1fr;gap:1rem;margin-bottom:2rem}
+.chart-box{background:var(--glass);border:1px solid var(--border);border-radius:18px;padding:1.2rem}
+.chart-box h3{font-size:.8rem;letter-spacing:.1em;text-transform:uppercase;color:var(--mut);margin-bottom:1rem}
+
+/* table */
+.panel{background:var(--glass);border:1px solid var(--border);border-radius:18px;padding:1.2rem;margin-bottom:2rem;backdrop-filter:blur(16px)}
+.panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem}
+.panel-head h2{font-size:1rem;font-weight:600}
+.search{padding:.5rem .9rem;border-radius:10px;border:1px solid var(--border);background:rgba(0,0,0,.25);color:var(--txt);font-family:inherit;font-size:.85rem;width:220px}
+.search:focus{outline:none;border-color:var(--grn)}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);padding:.7rem 1rem;border-bottom:1px solid var(--border)}
+td{padding:.8rem 1rem;border-bottom:1px solid rgba(255,255,255,.04);font-size:.9rem}
+tbody tr{transition:.15s} tbody tr:hover{background:var(--glass2)}
+.badge{font-family:'JetBrains Mono';font-size:.7rem;padding:.2rem .6rem;border-radius:20px}
+.b-grn{background:rgba(54,241,163,.15);color:var(--grn)} .b-org{background:rgba(255,159,67,.15);color:var(--org)} .b-red{background:rgba(255,92,124,.15);color:var(--red)} .b-blue{background:rgba(91,140,255,.15);color:var(--blue)} .b-pur{background:rgba(179,136,255,.15);color:var(--pur)}
+
+/* buttons */
+.btn{padding:.55rem 1.1rem;border-radius:10px;border:1px solid var(--border);background:var(--glass2);color:var(--txt);font-family:inherit;font-size:.85rem;font-weight:500;cursor:pointer;transition:.15s;display:inline-flex;align-items:center;gap:.4rem}
+.btn:hover{transform:translateY(-1px)}
+.btn.grn{background:linear-gradient(90deg,var(--grn),var(--grn2));color:#04130c;border:none}
+.btn.grn:hover{box-shadow:var(--glow)}
+.btn.red{color:var(--red);border-color:rgba(255,92,124,.4)} .btn.red:hover{background:rgba(255,92,124,.12)}
+.btn.sm{padding:.35rem .7rem;font-size:.78rem}
+.manager-only{display:none}
+
+/* forms */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.form-grid .full{grid-column:1/-1}
+label.fld{display:block;font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--mut);margin-bottom:.4rem}
+input.fld,select.fld{width:100%;padding:.7rem .9rem;border-radius:10px;border:1px solid var(--border);background:rgba(0,0,0,.25);color:var(--txt);font-family:inherit;font-size:.9rem}
+input.fld:focus,select.fld:focus{outline:none;border-color:var(--grn);box-shadow:var(--glow)}
+
+/* modal */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);z-index:100;display:none;align-items:center;justify-content:center}
+.overlay.show{display:flex;animation:fade .2s}
+.modal{width:440px;max-width:92vw;background:var(--glass);backdrop-filter:blur(24px);border:1px solid var(--border);border-radius:20px;padding:1.8rem;box-shadow:0 30px 80px rgba(0,0,0,.6);animation:pop .3s}
+.modal h3{font-size:1.05rem;margin-bottom:1.2rem}
+.modal-actions{display:flex;justify-content:flex-end;gap:.7rem;margin-top:1.4rem}
+
+/* toast */
+.toast{position:fixed;bottom:1.5rem;right:1.5rem;padding:.8rem 1.2rem;border-radius:12px;background:var(--glass);backdrop-filter:blur(20px);border:1px solid var(--border);font-size:.85rem;z-index:200;transform:translateY(120%);transition:.3s;display:flex;gap:.5rem;align-items:center}
+.toast.show{transform:none}
+.toast.ok{border-color:var(--grn);color:var(--grn)} .toast.err{border-color:var(--red);color:var(--red)}
+
+/* loader */
+#loader{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:300;transition:.4s}
+.spin{width:46px;height:46px;border:3px solid rgba(255,255,255,.1);border-top-color:var(--grn);border-radius:50%;animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:10px}
+@media(max-width:900px){.stats{grid-template-columns:1fr 1fr}.charts{grid-template-columns:1fr}.sidebar{transform:translateX(-100%)}.sidebar.open{transform:none}.main{margin-left:0}}
+</style>
+</head>
+<body>
+<div class="aurora"><span></span><span></span><span></span></div>
+<div class="grid-overlay"></div>
+
+<div id="loader"><div class="spin"></div></div>
+
+<!-- LOGIN -->
+<div id="login">
+  <canvas id="login-canvas"></canvas>
+  <div class="login-card">
+    <div class="brand">⚡ STOCKBASE</div>
+    <div class="brand-sub">Inventory Management System</div>
+    <div class="field"><label>Username</label><input id="lu" placeholder="manager"/></div>
+    <div class="field"><label>Password</label><input id="lp" type="password" placeholder="••••••" onkeydown="if(event.key==='Enter')doLogin()"/></div>
+    <div class="login-err" id="lerr"></div>
+    <button class="login-btn" onclick="doLogin()">Sign In</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="logo">⚡ STOCKBASE</div>
+    <div class="role">
+      <div class="avatar" id="av">M</div>
+      <div><div style="font-size:.75rem;color:var(--mut)" id="roleLbl">manager</div><div style="font-weight:600" id="userLbl">user</div></div>
+    </div>
+    <nav class="nav" id="nav"></nav>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <h1 id="pgTitle">Dashboard</h1>
+      <div class="right">
+        <span id="clock"></span>
+        <button class="btn sm" onclick="doLogout()">⎋ Logout</button>
+      </div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <section class="page active" id="p-dashboard">
+      <div class="stats">
+        <div class="card stat blue"><div class="lbl">Products</div><div class="val" id="s-prod">0</div></div>
+        <div class="card stat green"><div class="lbl">Total Stock</div><div class="val" id="s-stock">0</div></div>
+        <div class="card stat org"><div class="lbl">Low Stock</div><div class="val" id="s-low">0</div></div>
+        <div class="card stat pur"><div class="lbl">Proj. Profit</div><div class="val" id="s-profit">0</div></div>
+      </div>
+      <div class="charts">
+        <div class="chart-box"><h3>Profit by Product</h3><canvas id="profitChart" height="140"></canvas></div>
+        <div class="chart-box"><h3>Stock Health</h3><canvas id="healthChart" height="140"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h2>Recent Inventory</h2></div>
+        <table><thead><tr><th>Product</th><th>Stock</th><th>Price</th><th>Buying</th><th>Status</th></tr></thead>
+        <tbody id="dashBody"></tbody></table>
+      </div>
+    </section>
+
+    <!-- INVENTORY -->
+    <section class="page" id="p-inventory">
+      <div class="panel">
+        <div class="panel-head"><h2>All Products</h2>
+          <div style="display:flex;gap:.6rem">
+            <input class="search" id="invSearch" placeholder="Search…" oninput="renderInventory()"/>
+            <button class="btn grn manager-only" onclick="openProduct()">+ Add</button>
+          </div>
+        </div>
+        <table><thead><tr><th>ID</th><th>Name</th><th>Stock</th><th>Sell</th><th>Buy</th><th>Profit/U</th><th class="manager-only">Actions</th></tr></thead>
+        <tbody id="invBody"></tbody></table>
+      </div>
+    </section>
+
+    <!-- ADD PRODUCT -->
+    <section class="page" id="p-add-product">
+      <div class="panel" style="max-width:560px">
+        <div class="panel-head"><h2>New Product</h2></div>
+        <div class="form-grid">
+          <div class="full"><label class="fld">Name</label><input class="fld" id="p-name" placeholder="e.g. cooking oil"/></div>
+          <div><label class="fld">Stock</label><input class="fld" id="p-stock" type="number" placeholder="0"/></div>
+          <div><label class="fld">Selling</label><input class="fld" id="p-price" type="number" step="0.01" placeholder="0.00"/></div>
+          <div><label class="fld">Buying</label><input class="fld" id="p-bp" type="number" step="0.01" placeholder="0.00"/></div>
+        </div>
+        <div style="margin-top:1.2rem"><button class="btn grn" onclick="saveProduct()">Save Product</button></div>
+      </div>
+    </section>
+
+    <!-- SALE -->
+    <section class="page" id="p-add-sale">
+      <div class="panel" style="max-width:560px">
+        <div class="panel-head"><h2>Record Sale</h2></div>
+        <div class="form-grid">
+          <div><label class="fld">Customer</label><input class="fld" id="s-name" placeholder="anonymous"/></div>
+          <div><label class="fld">Phone</label><input class="fld" id="s-phone" placeholder="07xx"/></div>
+          <div class="full"><label class="fld">Product</label><input class="fld" id="s-prod" list="prodList" placeholder="select product"/><datalist id="prodList"></datalist></div>
+          <div><label class="fld">Quantity</label><input class="fld" id="s-qty" type="number" placeholder="0"/></div>
+        </div>
+        <div style="margin-top:1.2rem"><button class="btn grn" onclick="recordSale()">Record Sale</button></div>
+      </div>
+    </section>
+
+    <!-- PROFIT -->
+    <section class="page" id="p-profit">
+      <div class="panel">
+        <div class="panel-head"><h2>Profit Report</h2></div>
+        <table><thead><tr><th>Product</th><th>Stock</th><th>Profit/Unit</th><th>Total Profit</th></tr></thead>
+        <tbody id="profitBody"></tbody></table>
+      </div>
+    </section>
+
+    <!-- STAFF -->
+    <section class="page" id="p-staff">
+      <div class="panel">
+        <div class="panel-head"><h2>Staff</h2><button class="btn grn" onclick="openUser()">+ Add User</button></div>
+        <table><thead><tr><th>ID</th><th>Username</th><th>Role</th><th>Actions</th></tr></thead>
+        <tbody id="staffBody"></tbody></table>
+      </div>
+    </section>
+
+    <!-- PASSWORD -->
+    <section class="page" id="p-password">
+      <div class="panel" style="max-width:480px">
+        <div class="panel-head"><h2>Change Password</h2></div>
+        <div class="form-grid">
+          <div class="full"><label class="fld">Current</label><input class="fld" id="pw-old" type="password"/></div>
+          <div class="full"><label class="fld">New</label><input class="fld" id="pw-new" type="password"/></div>
+        </div>
+        <div style="margin-top:1.2rem"><button class="btn grn" onclick="changePassword()">Update</button></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- MODALS -->
+<div class="overlay" id="ovProduct"><div class="modal">
+  <h3 id="prodModalTitle">Add Product</h3>
+  <div class="form-grid">
+    <div class="full"><label class="fld">Name</label><input class="fld" id="m-p-name"/></div>
+    <div><label class="fld">Stock</label><input class="fld" id="m-p-stock" type="number"/></div>
+    <div><label class="fld">Selling</label><input class="fld" id="m-p-price" type="number" step="0.01"/></div>
+    <div><label class="fld">Buying</label><input class="fld" id="m-p-bp" type="number" step="0.01"/></div>
+  </div>
+  <div class="modal-actions"><button class="btn" onclick="closeModals()">Cancel</button><button class="btn grn" onclick="submitProduct()">Save</button></div>
+</div></div>
+
+<div class="overlay" id="ovUser"><div class="modal">
+  <h3>Add Staff</h3>
+  <div class="form-grid">
+    <div><label class="fld">ID</label><input class="fld" id="m-u-id" type="number"/></div>
+    <div><label class="fld">Username</label><input class="fld" id="m-u-name"/></div>
+    <div><label class="fld">Password</label><input class="fld" id="m-u-pass" type="password"/></div>
+    <div><label class="fld">Role</label><select class="fld" id="m-u-role"><option value="cashier">Cashier</option><option value="manager">Manager</option></select></div>
+  </div>
+  <div class="modal-actions"><button class="btn" onclick="closeModals()">Cancel</button><button class="btn grn" onclick="submitUser()">Add</button></div>
+</div></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API='http://127.0.0.1:8000';
+let TOKEN=localStorage.getItem('sb_token'), ROLE=localStorage.getItem('sb_role'), USER=localStorage.getItem('sb_user');
+let allProducts=[], profitChart, healthChart;
+
+/* ---------- helpers ---------- */
+const $ = id => document.getElementById(id);
+async function api(path,method='GET',body=null){
+  const h={'Content-Type':'application/json'}; if(TOKEN)h['Authorization']='Bearer '+TOKEN;
+  const r=await fetch(API+path,{method,headers:h,body:body?JSON.stringify(body):null});
+  if(r.status===401){doLogout();throw new Error('Session expired');}
+  if(!r.ok){const e=await r.json().catch(()=>({detail:'Error'}));throw new Error(e.detail||'Error');}
+  return r.status===204?null:r.json();
+}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function money(n){return (n??0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});}
+function toast(msg,ok=true){const t=$('toast');t.textContent=(ok?'✓ ':'✕ ')+msg;t.className='toast show '+(ok?'ok':'err');setTimeout(()=>t.className='toast',3000);}
+function animateNum(el,to){let from=0,dur=800,t0=performance.now();(function step(t){let p=Math.min((t-t0)/dur,1);el.textContent=Math.floor(from+(to-from)*p).toLocaleString();if(p<1)requestAnimationFrame(step);})(t0);}
+
+/* ---------- auth ---------- */
+async function doLogin(){
+  $('lerr').style.display='none';
+  try{
+    const d=await api('/login','POST',{username:$('lu').value.trim(),password:$('lp').value});
+    TOKEN=d.token;ROLE=d.role;USER=d.username;
+    localStorage.setItem('sb_token',TOKEN);localStorage.setItem('sb_role',ROLE);localStorage.setItem('sb_user',USER);
+    enterApp();
+  }catch(e){$('lerr').textContent=e.message;$('lerr').style.display='block';}
+}
+function doLogout(){localStorage.clear();TOKEN=ROLE=USER=null;location.reload();}
+function enterApp(){
+  $('login').style.display='none';$('app').style.display='block';
+  $('roleLbl').textContent=ROLE;$('userLbl').textContent=USER;$('av').textContent=USER[0].toUpperCase();
+  buildNav();applyRole();
+  showPage('dashboard');
+  loadDashboard();loadProductsForSale();
+}
+
+/* ---------- nav ---------- */
+const NAV={
+  dashboard:{i:'▦',t:'Dashboard',all:true},
+  inventory:{i:'📦',t:'Inventory',all:true},
+  'add-product':{i:'➕',t:'Add Product',mgr:true},
+  'add-sale':{i:'🧾',t:'Record Sale',all:true},
+  profit:{i:'💰',t:'Profit',mgr:true},
+  staff:{i:'👥',t:'Staff',mgr:true},
+  password:{i:'🔐',t:'Password',all:true}
+};
+function buildNav(){
+  const n=$('nav');n.innerHTML='';
+  let html='';
+  for(const[k,v]of Object.entries(NAV)){
+    if(v.mgr&&ROLE!=='manager')continue;
+    const sep=v.mgr?'<div class="nav-sep">Admin</div>':'';
+    html+=`<a data-p="${k}">${v.i} ${v.t}</a>`;
+  }
+  // insert separators logically
+  n.innerHTML=Object.entries(NAV).map(([k,v])=>{
+    if(v.mgr&&ROLE!=='manager')return'';
+    return `<a data-p="${k}" onclick="showPage('${k}',this)">${v.i} <span>${v.t}</span></a>`;
+  }).join('').replace('<a data-p="inventory">','<div class="nav-sep">Products</div><a data-p="inventory">').replace('<a data-p="add-sale">','<div class="nav-sep">Sales</div><a data-p="add-sale">').replace('<a data-p="staff">','<div class="nav-sep">Admin</div><a data-p="staff">').replace('<a data-p="password">','<div class="nav-sep">Account</div><a data-p="password">');
+  n.querySelector('a').classList.add('active');
+}
+function applyRole(){document.querySelectorAll('.manager-only').forEach(e=>e.style.display=(ROLE==='manager'?'inline-flex':'none'));}
+function showPage(p,el){
+  document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+  $('p-'+p).classList.add('active');
+  document.querySelectorAll('.nav a').forEach(a=>a.classList.remove('active'));
+  if(el)el.classList.add('active');
+  $('pgTitle').textContent=NAV[p].t;
+  if(p==='dashboard')loadDashboard();
+  if(p==='inventory')renderInventory();
+  if(p==='profit')loadProfit();
+  if(p==='staff')loadStaff();
+}
+
+/* ---------- dashboard ---------- */
+async function loadDashboard(){
+  try{
+    const p=await api('/products');allProducts=p;
+    animateNum($('s-prod'),p.length);
+    animateNum($('s-stock'),p.reduce((s,x)=>s+x.stock,0));
+    animateNum($('s-low'),p.filter(x=>x.stock<10).length);
+    animateNum($('s-profit'),p.reduce((s,x)=>s+(x.buying_price!=null?(x.price-x.buying_price)*x.stock:0),0));
+    $('dashBody').innerHTML=p.slice(0,6).map(x=>{
+      const st=x.stock===0?'<span class="badge b-red">Out</span>':x.stock<10?'<span class="badge b-org">Low</span>':'<span class="badge b-grn">Ok</span>';
+      return `<tr><td>${esc(x.product_name)}</td><td>${x.stock}</td><td>${money(x.price)}</td><td>${x.buying_price!=null?money(x.buying_price):'-'}</td><td>${st}</td></tr>`;
+    }).join('')||'<tr><td colspan="5" style="color:var(--mut);text-align:center;padding:2rem">No products</td></tr>';
+    drawProfitChart(p);drawHealth(p);
+  }catch(e){toast(e.message,false);}
+}
+function drawProfitChart(p){
+  const ctx=$('profitChart');if(profitChart)profitChart.destroy();
+  profitChart=new Chart(ctx,{type:'bar',data:{labels:p.map(x=>x.product_name),datasets:[{label:'Total Profit',data:p.map(x=>x.buying_price!=null?(x.price-x.buying_price)*x.stock:0),backgroundColor:'#36f1a3',borderRadius:6}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#8b95a7'},grid:{display:false}},y:{ticks:{color:'#8b95a7'},grid:{color:'rgba(255,255,255,.05)'}}}}});
+}
+function drawHealth(p){
+  const ok=p.filter(x=>x.stock>=10).length,low=p.filter(x=>x.stock>0&&x.stock<10).length,out=p.filter(x=>x.stock===0).length;
+  const ctx=$('healthChart');if(healthChart)healthChart.destroy();
+  healthChart=new Chart(ctx,{type:'doughnut',data:{labels:['Healthy','Low','Out'],datasets:[{data:[ok,low,out],backgroundColor:['#36f1a3','#ff9f43','#ff5c7c'],borderWidth:0}]},options:{cutout:'70%',plugins:{legend:{position:'bottom',labels:{color:'#8b95a7',boxWidth:12}}}}});
+}
+
+/* ---------- inventory ---------- */
+function renderInventory(){
+  const q=($('invSearch').value||'').toLowerCase();
+  const p=allProducts.filter(x=>x.product_name.includes(q));
+  $('invBody').innerHTML=p.map(x=>{
+    const pu=x.buying_price!=null?(x.price-x.buying_price).toFixed(2):'-';
+    const act=ROLE==='manager'?`<button class="btn sm" onclick="openProduct('${esc(x.product_name)}')">Edit</button> <button class="btn sm red" onclick="delProduct('${esc(x.product_name)}')">Del</button>`:'';
+    return `<tr><td>${x.product_id}</td><td>${esc(x.product_name)}</td><td>${x.stock}</td><td>${money(x.price)}</td><td>${x.buying_price!=null?money(x.buying_price):'-'}</td><td>${pu}</td><td class="manager-only">${act}</td></tr>`;
+  }).join('')||'<tr><td colspan="7" style="color:var(--mut);text-align:center;padding:2rem">No products</td></tr>';
+}
+async function loadInventory(){allProducts=await api('/products');renderInventory();}
+
+let editing=null;
+function openProduct(name){
+  editing=name||null;$('prodModalTitle').textContent=name?'Edit Product':'Add Product';
+  if(name){const x=allProducts.find(p=>p.product_name===name);$('m-p-name').value=x.product_name;$('m-p-stock').value=x.stock;$('m-p-price').value=x.price;$('m-p-bp').value=x.buying_price??'';}
+  else{$('m-p-name').value='';$('m-p-stock').value='';$('m-p-price').value='';$('m-p-bp').value='';}
+  $('ovProduct').classList.add('show');
+}
+async function submitProduct(){
+  const body={name:$('m-p-name').value.trim(),stock:+$('m-p-stock').value,price:+$('m-p-price').value,buying_price:+$('m-p-bp').value};
+  if(!body.name||isNaN(body.stock)||isNaN(body.price)||isNaN(body.buying_price)){toast('Fill all fields',false);return;}
+  try{
+    if(editing){const b={};if($('m-p-stock').value)b.new_stock=body.stock;if($('m-p-price').value)b.new_price=body.price;if($('m-p-bp').value)b.new_buying_price=body.buying_price;await api('/products/'+encodeURIComponent(editing),'PUT',b);}
+    else await api('/products','POST',body);
+    toast('Saved');closeModals();loadDashboard();loadInventory();
+  }catch(e){toast(e.message,false);}
+}
+async function delProduct(name){if(!confirm('Delete '+name+'?'))return;try{await api('/products/'+encodeURIComponent(name),'DELETE');toast('Deleted');loadDashboard();loadInventory();}catch(e){toast(e.message,false);}}
+
+/* ---------- sale ---------- */
+async function loadProductsForSale(){const p=await api('/products');$('prodList').innerHTML=p.map(x=>`<option value="${esc(x.product_name)}">`).join('');}
+async function recordSale(){
+  const body={customer_name:$('s-name').value.trim()||'anonymous',phone:$('s-phone').value.trim(),product_name:$('s-prod').value.trim(),quantity:+$('s-qty').value};
+  if(!body.phone||!body.product_name||isNaN(body.quantity)){toast('Required fields missing',false);return;}
+  try{await api('/sales','POST',body);toast('Sale recorded');['s-name','s-phone','s-prod','s-qty'].forEach(i=>$(i).value='');loadDashboard();}catch(e){toast(e.message,false);}
+}
+
+/* ---------- profit ---------- */
+async function loadProfit(){const r=await api('/profit-report');$('profitBody').innerHTML=r.map(x=>`<tr><td>${esc(x.product_name)}</td><td>${x.stock}</td><td>${money(x.profit_per_unit)}</td><td class="${x.total_profit>=0?'b-grn':'b-red'}">${money(x.total_profit)}</td></tr>`).join('');}
+
+/* ---------- staff ---------- */
+async function loadStaff(){const u=await api('/users');$('staffBody').innerHTML=u.map(x=>`<tr><td>${x.id}</td><td>${esc(x.username)}</td><td><span class="badge ${x.role==='manager'?'b-pur':'b-blue'}">${x.role}</span></td><td><button class="btn sm" onclick="roleUser('${esc(x.username)}')">Role</button> <button class="btn sm red" onclick="delUser('${esc(x.username)}')">Del</button></td></tr>`).join('');}
+function openUser(){$('m-u-id').value='';$('m-u-name').value='';$('m-u-pass').value='';$('ovUser').classList.add('show');}
+async function submitUser(){const b={id:+$('m-u-id').value,username:$('m-u-name').value.trim(),password:$('m-u-pass').value,role:$('m-u-role').value};if(isNaN(b.id)||!b.username||!b.password){toast('Fill all',false);return;}try{await api('/users','POST',b);toast('User added');closeModals();loadStaff();}catch(e){toast(e.message,false);}}
+async function delUser(u){if(!confirm('Delete '+u+'?'))return;try{await api('/users/'+encodeURIComponent(u),'DELETE');toast('Deleted');loadStaff();}catch(e){toast(e.message,false);}}
+async function roleUser(u){const r=prompt('New role (manager/cashier):');if(!r)return;try{await api('/users/'+encodeURIComponent(u)+'/role','PUT',{new_role:r});toast('Updated');loadStaff();}catch(e){toast(e.message,false);}}
+
+/* ---------- password ---------- */
+async function changePassword(){const b={old_password:$('pw-old').value,new_password:$('pw-new').value};if(!b.old_password||!b.new_password){toast('Fill both',false);return;}try{await api('/me/password','PUT',b);toast('Password changed');$('pw-old').value='';$('pw-new').value='';}catch(e){toast(e.message,false);}}
+
+/* ---------- misc ---------- */
+function closeModals(){document.querySelectorAll('.overlay').forEach(o=>o.classList.remove('show'));}
+document.querySelectorAll('.overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)closeModals();}));
+setInterval(()=>$('clock').textContent=new Date().toLocaleString(),1000);
+
+/* particles */
+(function(){const c=$('login-canvas');if(!c)return;const x=c.getContext('2d');function rs(){c.width=innerWidth;c.height=innerHeight;}rs();addEventListener('resize',rs);const ps=Array.from({length:70},()=>({x:Math.random()*c.width,y:Math.random()*c.height,vx:(Math.random()-.5)*.5,vy:(Math.random()-.5)*.5}));function loop(){x.clearRect(0,0,c.width,c.height);x.fillStyle='#36f1a3';ps.forEach(p=>{p.x+=p.vx;p.y+=p.vy;if(p.x<0||p.x>c.width)p.vx*=-1;if(p.y<0||p.y>c.height)p.vy*=-1;x.beginPath();x.arc(p.x,p.y,1.6,0,7);x.fill();});requestAnimationFrame(loop);}loop();})();
+
+/* boot */
+window.addEventListener('load',()=>{
+  $('loader').style.opacity=0;setTimeout(()=>$('loader').style.display='none',400);
+  if(TOKEN&&ROLE&&USER){enterApp();}else{$('login').style.display='flex';}
+});
+</script>
+</body>
+</html>
