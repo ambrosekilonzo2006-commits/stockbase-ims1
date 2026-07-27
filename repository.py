@@ -103,5 +103,8 @@ class  DatabaseRepository:
     def update_user_role(self,username,new_role):
         que=("UPDATE users SET role=%s WHERE username=%s;")
         return self.execute_query(que,(new_role,username))
+    def get_all_users(self):
+        que=("SELECT ID,username,role FROM users;")
+        return self.execute_query(que,fetch=True)    
 
 
