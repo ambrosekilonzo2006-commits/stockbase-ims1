@@ -12,16 +12,31 @@ class  DatabaseRepository:
             self.conn.commit()
             return True
         
-    def verify_user(self,username,password):
-        
-        que="SELECT role FROM users WHERE username=%s  AND password =%s;"
-        out=self.execute_query(que,(username,) ,fetch=True) 
-        if not out:
+    def verify_user(self, username, password):
+        query = """
+        SELECT role, password
+        FROM users
+        WHERE username = %s;
+    """
+
+        output = self.execute_query(
+            query,
+            (username,),
+            fetch=True
+    )
+
+        if not output:
             return None
-        role,hashed=out[0]
-        if bcrypt.checkpw(password.encode(), hashed.encode()):
+
+        role, hashed_password = output[0]
+
+        if bcrypt.checkpw(
+            password.encode("utf-8"),
+            hashed_password.encode("utf-8")
+    ):
             return role
-        return None 
+
+        return None
     def add_product(self,name,stock,price,buying_price):
         que="INSERT INTO products(product_name,stock,price,buying_price)VALUES(%s,%s,%s,%s);"
         return self.execute_query(que,(name,stock,price,buying_price))
